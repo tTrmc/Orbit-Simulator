@@ -10,8 +10,8 @@ FONT = pygame.font.SysFont('Consolas', 16)
 class Planet:
     AU = 149597870.7 * 1000
     G = 6.67430 * 10**-11 
-    SCALE = 100 / AU 
-    TIMESTEP = 60*60*24
+    SCALE = 100 / AU  # 1 AU = 100 pixels
+    TIMESTEP = 60*60*24  # 1 day
     
     def __init__(self, x, y, radius, color, mass):
         self.x = x
@@ -27,21 +27,21 @@ class Planet:
         self.x_vel = 0
         self.y_vel = 0
         
-    def draw(self, win):
-        x = self.x * self.SCALE + WIDTH / 2
-        y = self.y * self.SCALE + HEIGHT / 2
+    def draw(self, win, offset_x, offset_y):
+        x = self.x * self.SCALE + WIDTH / 2 - offset_x
+        y = self.y * self.SCALE + HEIGHT / 2 - offset_y
         
         if len(self.orbit) > 2:
             updated_points = []
             for point in self.orbit:
-                x, y = point
-                x = x * self.SCALE + WIDTH / 2
-                y = y * self.SCALE + HEIGHT / 2
-                updated_points.append((x, y))
+                px, py = point
+                px = px * self.SCALE + WIDTH / 2 - offset_x
+                py = py * self.SCALE + HEIGHT / 2 - offset_y
+                updated_points.append((int(px), int(py)))
             
             pygame.draw.lines(win, self.color, False, updated_points, 2)
         
-        pygame.draw.circle(win, self.color, (x, y), self.radius)
+        pygame.draw.circle(win, self.color, (int(x), int(y)), self.radius)
         
         if not self.sun:
             distance_text = FONT.render(f"{round(self.distance_to_sun/1000, 1)}km", 1, (255, 255, 255))
@@ -78,7 +78,6 @@ class Planet:
         self.x += self.x_vel * self.TIMESTEP
         self.y += self.y_vel * self.TIMESTEP
         self.orbit.append((self.x, self.y))
-        
 
 def main():
     run = True
@@ -113,6 +112,14 @@ def main():
     
     planets = [sun, earth, mars, mercury, venus, jupiter, saturn, uranus, neptune]
     
+    offset_x = 0
+    offset_y = 0
+    dragging = False
+    mouse_start_x = 0
+    mouse_start_y = 0
+    offset_start_x = 0
+    offset_start_y = 0
+    
     while run:
         clock.tick(60)
         WIN.fill((0,0,0))
@@ -120,10 +127,36 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left mouse button
+                    dragging = True
+                    mouse_start_x, mouse_start_y = event.pos
+                    offset_start_x = offset_x
+                    offset_start_y = offset_y
+                elif event.button == 4:  # Scroll up, zoom in
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    old_scale = Planet.SCALE
+                    Planet.SCALE *= 1.1
+                    offset_x = (offset_x + mouse_x - WIDTH/2) * (Planet.SCALE / old_scale) - (mouse_x - WIDTH/2)
+                    offset_y = (offset_y + mouse_y - HEIGHT/2) * (Planet.SCALE / old_scale) - (mouse_y - HEIGHT/2)
+                elif event.button == 5:  # Scroll down, zoom out
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    old_scale = Planet.SCALE
+                    Planet.SCALE /= 1.1
+                    offset_x = (offset_x + mouse_x - WIDTH/2) * (Planet.SCALE / old_scale) - (mouse_x - WIDTH/2)
+                    offset_y = (offset_y + mouse_y - HEIGHT/2) * (Planet.SCALE / old_scale) - (mouse_y - HEIGHT/2)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    dragging = False
+            elif event.type == pygame.MOUSEMOTION:
+                if dragging:
+                    current_x, current_y = event.pos
+                    offset_x = offset_start_x - (current_x - mouse_start_x)
+                    offset_y = offset_start_y - (current_y - mouse_start_y)
         
         for planet in planets:
             planet.update_position(planets)
-            planet.draw(WIN)
+            planet.draw(WIN, offset_x, offset_y)
         
         pygame.display.update()
 
